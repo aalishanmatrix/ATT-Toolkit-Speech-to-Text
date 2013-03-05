@@ -1,0 +1,292 @@
+<apex:page docType="html-5.0" sidebar="false" 
+           showHeader="false" standardStylesheets="false" 
+           cache="false" controller="CaseDemoController">
+<html>
+<head>
+<title>My Cases</title>
+
+
+<apex:stylesheet value="{!URLFOR($Resource.jQueryMobile101, 'jquery.mobile-1.0.1/jquery.mobile-1.0.1.min.css')}" />
+<apex:includeScript value="{!URLFOR($Resource.jQueryMobile101, 'jquery.mobile-1.0.1/demos/jquery.js')}"/>
+<apex:includeScript value="{!URLFOR($Resource.jQueryMobile101, 'jquery.mobile-1.0.1/jquery.mobile-1.0.1.min.js')}"/>
+<apex:dynamicComponent componentValue="{!CordovaJS}"/>
+    
+<style type="text/css">
+    .ui-icon-play {
+    	background-image: url("{!URLFOR($Resource.Icons, 'play.png')}");
+    }    	
+    .ui-icon-stop {
+    	background-image: url("{!URLFOR($Resource.Icons, 'stop.png')}");
+    }    	
+    .ui-icon-searchBtn {
+    	background-image: url("{!URLFOR($Resource.Icons, 'search.png')}");
+    }    	
+    .ui-icon-cancel {
+    	background-image: url("{!URLFOR($Resource.Icons, 'cancel.png')}");
+    }    	
+</style>
+    
+<script type="text/javascript">
+    function logToConsole(msg){
+    	console.log(msg);
+    }
+
+    function disableBtn($Btn) {
+        $Btn.attr('disabled', 'disabled').addClass('ui-disabled');
+    }
+    
+    function enableBtn($Btn) {
+        $Btn.removeAttr("disabled").removeClass('ui-disabled');
+    }
+    
+    var caseRecs = new Array();
+	// Audio player
+    var recObj = null;
+    var mediaObj = null;
+    var mediaTimer = null;
+
+    var mediaSrc = null;
+    var mediaRecFile = "recording.wav";
+    var fileEntrySrc = "file path not set";
+    var fileEntryURL = "file URL not set";
+    var recAsBase64String;
+    
+    var $j = jQuery.noConflict(); 
+
+    $j(document).ready(function() {
+    	getAllCases();
+    });
+    
+    function getAllCases(){
+        $j.mobile.showPageLoadingMsg();
+    	$j('input[data-type="search"]').val('');
+        getCases(function(){
+                    $j.mobile.hidePageLoadingMsg();
+                });    
+    }
+    
+    function getCases(callback) {
+	    CaseDemoController.getCaseRecs(function(records, e) { 
+                                            showCases(records, callback) }, 
+                                            {escape:true}); 
+    }
+    
+    function showCases(records, callback) {    
+    	$j('#caseList').empty();
+        caseRecs.length = 0;
+        
+        
+        for(var i = 0; i < records.length; i++) { caseRecs[records[i].Id] = records[i]; }
+        var x = 0;
+        $j.each(records,
+            function() {
+            var newLi = $j('<li></li>');
+                        
+            var newLink = $j('<a id="' +this.Id+ '" data-transition="flip"><h2 style="margin-left: 30px; margin-top: 2px">' +this.CaseNumber+ '</h2><p style="margin-left: 30px;">'+this.Account.Name+'</p></a>');
+            newLink.click(function(e) {
+                e.preventDefault();
+                $j.mobile.showPageLoadingMsg();
+                $j('#caseNumber').html(caseRecs[this.id].CaseNumber);
+                $j('#status').html(caseRecs[this.id].Status);
+                $j('#priority').html(caseRecs[this.id].Priority);
+                $j('#subject').html(caseRecs[this.id].Subject);
+                $j('#desc').html(caseRecs[this.id].Description);
+				$j('#addr').html(caseRecs[this.id].Account.BillingStreet);
+                $j('#caseId').val(caseRecs[this.id].Id);
+				$j('#loc').attr('src', 'http://maps.googleapis.com/maps/api/staticmap?size=300x300&sensor=false&markers=size:mid%7Ccolor:red%7C'+ encodeURI(caseRecs[this.id].Account.BillingStreet) );
+                $j.mobile.hidePageLoadingMsg();
+                
+                $j.mobile.changePage('#detailpage', {changeHash: true});
+            });
+            newLi.append(newLink);            
+            newLi.appendTo('#caseList');
+            x++;
+          });
+        
+        $j('#caseList').listview('refresh');
+        if(callback != null) { callback(); }
+    }
+    
+    //OnSuccess Callback
+    function onSuccess() {
+        logToConsole("Audio Success");
+    }
+    
+    // onError Callback 
+    function onError(error) {
+        alert('code: '    + error.code    + '\n' + 
+              'message: ' + error.message + '\n');
+    }
+        
+    function getFileSystem(onSuccess) {
+        window.requestFileSystem(LocalFileSystem.PERSISTENT, 0, onSuccess, function() {
+            alert("Failed in creating media file in FileSystem");
+        });
+    }
+
+    function onSuccessFSCreateFile(fileSystem) {
+        fileSystem.root.getFile(mediaRecFile, { create: true, exclusive: false }, onOK_CreateFile, fileFail);
+    }
+    
+    function onOK_CreateFile(fileEntry) {
+        logToConsole("=onOK_GetFile()");
+        fileEntrySrc = fileEntry.fullPath;
+        
+        mediaObj = new Media(fileEntry.fullPath, 
+                // success callback
+                function () {
+                    logToConsole("recordAudio():Audio Success");
+                },
+                // error callback
+                function (err) {
+                    alert("Audio Error: " + err.message);
+                });
+
+        if (mediaObj) {
+            mediaObj.startRecord();
+            logToConsole("Status: recording");
+        } else {
+            alert("Can't start recording: Media Object not initialized");
+        }
+    }
+    
+    function getRecordingAsBase64EncodedString() {
+        logToConsole("=getPureDataUrlEncodedString");
+        getFileSystem(onSuccessFSGetFile);
+    }
+    
+    function onSuccessFSGetFile(fileSystem) {
+        logToConsole("=onSuccessFSGetFile");
+        logToConsole("mediaRecFile=" + mediaRecFile);
+        fileSystem.root.getFile(mediaRecFile, { create: false, exclusive: false }, gotFileEntry, fileFail);
+    }
+    
+    function fileFail(error) {
+        alert("Failed getting media file " + error.code);
+        logToConsole("***test: failed getting media file " + error.code);
+    };
+    
+    function gotFileEntry(fileEntry) {
+        logToConsole("=gotFileEntry(fileEntry)");
+        fileEntry.file(readDataUrl, function(){alert("fileEntry.file(gotFile...");});
+    }
+    
+    function readDataUrl(file) {
+        logToConsole("=readDataUrl(file)");
+        var reader = new FileReader();
+        reader.onloadend = function(evt) {
+            recAsBase64String = evt.target.result;
+            if (recAsBase64String.indexOf('base64,') > 0) {
+                recAsBase64String = recAsBase64String.split('base64,')[1];
+                logToConsole("recAsBase64String without base64 ============== " + recAsBase64String.substring(0,80));
+            }
+        };
+        logToConsole("readDataUrl(file)" + file);
+        reader.readAsDataURL(file);
+    }
+    
+    function recordStartAudio() {
+		enableBtn($j("#stopRec"));
+		disableBtn($j("#playRec"));
+		disableBtn($j("#searchRec"));
+		disableBtn($j("#cancelRec"));
+        $j.mobile.changePage('#voiceSearch', 'pop', true, true);  
+        getFileSystem(onSuccessFSCreateFile);
+    }
+    
+    //Stop Recording audio
+    function recordStopAudio() {	
+		disableBtn($j("#stopRec"));
+		enableBtn($j("#playRec"));
+		enableBtn($j("#searchRec"));
+		enableBtn($j("#cancelRec"));
+        logToConsole("=recordStopAudio()");
+        if (mediaObj) {
+            mediaObj.stopRecord();
+            logToConsole("=mediaObj.stopRecord();");
+		    getRecordingAsBase64EncodedString();
+        }
+    }
+
+	function playAudio() {
+		if (mediaObj == null) {
+            // Create Media object from src
+            logToConsole("mediaObj = new Media(...);");
+            mediaObj = new Media(fileEntrySrc, onSuccess, onError);
+		} 
+
+		mediaObj.play();
+    }
+    
+    function voiceSearch(){
+		disableBtn($j("#stopRec"));
+		disableBtn($j("#playRec"));
+		disableBtn($j("#searchRec"));
+		disableBtn($j("#cancelRec"));
+		$j.mobile.showPageLoadingMsg();
+        CaseDemoController.searchCases(recAsBase64String,'audio/wav', function(result, e) { 
+			if (e.status){
+                $j('input[data-type="search"]').val(result.resultText);
+                showCases(result.cases, function(){
+                                            $j.mobile.hidePageLoadingMsg();
+                                        });
+                $j.mobile.changePage('#listpage', {changeHash: false});
+			}else {
+				$j.mobile.hidePageLoadingMsg();
+				$j('#msg').html("Sorry, I couldn't understand you");
+				enableBtn($j("#cancelRec"));
+			}
+        }); 
+    }
+</script>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+</head>
+
+<body>
+    
+    <div data-role="page" data-theme="b" id="listpage">
+            
+        <div data-role="header" data-position="fixed">
+            <a href='#' id="home" class='ui-btn-left' data-icon='home' onClick="getAllCases();">My Cases</a>
+			<h2>Cases</h2>
+            <a href='#' id="search" class='ui-btn-right' data-icon='search' onClick="recordStartAudio();">Search</a>
+        </div>
+        <div data-role="content" id="merchList">            
+            <ul id="caseList" data-filter="true" data-inset="true" data-role="listview" 
+                data-theme="c" data-dividertheme="b">
+            </ul>
+        </div>
+    </div>
+    
+    <div data-role="page" data-theme="b" id="detailpage">
+        <div data-role="header" data-position="fixed">
+            <a href='#listpage' id="back2CaseList" class='ui-btn-left' data-icon='arrow-l' data-direction="reverse" data-transition="flip">Back</a>
+            <h1>Case Details</h1>
+        </div>
+        <div data-role="content">
+            <h1 id="caseName"></h1>
+            <table>
+                <tr><td><b>Case Number:</b></td><td id="caseNumber"></td></tr>
+                <tr><td><b>Status:</b></td><td id="status"></td></tr>
+                <tr><td><b>Priority:</b></td><td id="priority"></td></tr>
+                <tr><td><b>Subject:</b></td><td id="subject"></td></tr>
+                <tr><td><b>Desciption:</b></td><td id="desc"></td></tr>
+				<tr><td><b>Address:</b></td><td id="addr"></td></tr>
+            </table>
+			<img id="loc" src=""/>
+            <input type="hidden" id="caseId" />
+        </div>    
+    </div>
+    <div data-role="dialog" data-transition="flip" id="voiceSearch">
+        <div data-role="content">
+            <h3 id="msg" style="text-align:center;color:red">Please speak now...</h3>
+			<a id="stopRec" data-role="button" data-iconpos="bottom" data-icon="stop" onClick="recordStopAudio();">Stop Recording</a>
+			<a id="playRec" data-role="button" data-iconpos="bottom" data-icon="play" onClick="playAudio();">Play back</a>
+			<a id="searchRec" data-role="button" data-iconpos="bottom" data-icon="searchBtn" onClick="voiceSearch();">Search</a>
+			<a href='#listpage' data-direction="reverse" data-iconpos="bottom" data-icon="cancel" id="cancelRec" data-role="button">Cancel</a>
+        </div>
+    </div>    
+</body>
+</html>
+</apex:page>
