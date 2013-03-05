@@ -6,6 +6,6 @@ This sample application was demoed during the [AT&T Toolkit for Salesforce Platf
 
 Application screenshots
 ===========
-![Home page](https://raw.github.com/sbhanot-sfdc/ATT-Toolkit-Speech-to-Text/master/images/cases.png "Home page")
-![Record page](https://raw.github.com/sbhanot-sfdc/ATT-Toolkit-Speech-to-Text/master/images/record.png "Record page")
-![Search page](https://raw.github.com/sbhanot-sfdc/ATT-Toolkit-Speech-to-Text/master/images/search.png "Search page")
+![Home page](https://raw.github.com/sbhanot-sfdc/ATT-Toolkit-Speech-to-Text/master/images/cases.PNG "Home page")
+![Record page](https://raw.github.com/sbhanot-sfdc/ATT-Toolkit-Speech-to-Text/master/images/record.PNG "Record page")
+![Search page](https://raw.github.com/sbhanot-sfdc/ATT-Toolkit-Speech-to-Text/master/images/search.PNG "Search page")
